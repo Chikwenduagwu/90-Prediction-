@@ -1,0 +1,36 @@
+{
+  "name": "goalmarket",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GoalMarket — LMSR Football Prediction Markets on X Layer",
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install",
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:testnet": "npx hardhat run contracts/deploy.ts --network xlayer_testnet",
+    "deploy:mainnet": "npx hardhat run contracts/deploy.ts --network xlayer",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "node": "npx hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "typechain": "^8.3.0",
+    "hardhat": "^2.22.0",
+    "ethers": "^6.11.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.0.0",
+    "chai": "^4.4.0",
+    "@types/chai": "^4.3.0",
+    "dotenv": "^16.4.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}

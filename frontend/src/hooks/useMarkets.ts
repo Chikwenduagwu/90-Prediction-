@@ -9,8 +9,6 @@ import { CONTRACT_ADDRESS } from "@/lib/wagmiConfig";
 import { PREDICTION_MARKET_ABI } from "@/lib/contractAbi";
 import { getImpliedProbabilities, probToOdds } from "@/lib/lmsr";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface Market {
   id: bigint;
   homeTeam: string;
@@ -20,12 +18,11 @@ export interface Market {
   closingTime: bigint;
   resolved: boolean;
   cancelled: boolean;
-  winner: number;                   // 0=None, 1=Home, 2=Away, 3=Draw
+  winner: number;
   shares: [bigint, bigint, bigint];
   totalVolume: bigint;
   feesCollected: bigint;
   externalMatchId: string;
-  // Derived
   probHome: number;
   probAway: number;
   probDraw: number;
@@ -36,13 +33,13 @@ export interface Market {
   minutesToClose: number;
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+const isContractConfigured = !!CONTRACT_ADDRESS && CONTRACT_ADDRESS !== "0x";
 
 export function useMarkets() {
   const queryClient = useQueryClient();
   const [marketIds, setMarketIds] = useState<bigint[]>([]);
 
-  // Step 1: fetch all market IDs
+  // Step 1: fetch all market IDs — skip if no contract address
   const { data: idsData, isLoading: idsLoading } = useReadContracts({
     contracts: [
       {
@@ -51,6 +48,7 @@ export function useMarkets() {
         functionName: "getAllMarketIds",
       },
     ],
+    query: { enabled: isContractConfigured },
   });
 
   useEffect(() => {
@@ -66,10 +64,10 @@ export function useMarkets() {
       functionName: "getMarket" as const,
       args: [id] as const,
     })),
-    query: { enabled: marketIds.length > 0 },
+    query: { enabled: isContractConfigured && marketIds.length > 0 },
   });
 
-  // Step 3: watch for new events to trigger refetch
+  // Step 3: watch for new events
   useWatchContractEvent({
     address: CONTRACT_ADDRESS,
     abi: PREDICTION_MARKET_ABI,
@@ -78,24 +76,23 @@ export function useMarkets() {
       void refetch();
       queryClient.invalidateQueries({ queryKey: ["markets"] });
     },
+    enabled: isContractConfigured,
   });
 
   useWatchContractEvent({
     address: CONTRACT_ADDRESS,
     abi: PREDICTION_MARKET_ABI,
     eventName: "MarketCreated",
-    onLogs: () => {
-      void refetch();
-    },
+    onLogs: () => void refetch(),
+    enabled: isContractConfigured,
   });
 
   useWatchContractEvent({
     address: CONTRACT_ADDRESS,
     abi: PREDICTION_MARKET_ABI,
     eventName: "MarketResolved",
-    onLogs: () => {
-      void refetch();
-    },
+    onLogs: () => void refetch(),
+    enabled: isContractConfigured,
   });
 
   // Step 4: enrich with derived data
@@ -118,9 +115,7 @@ export function useMarkets() {
 
       return {
         ...m,
-        probHome,
-        probAway,
-        probDraw,
+        probHome, probAway, probDraw,
         oddsHome: probToOdds(probHome),
         oddsAway: probToOdds(probAway),
         oddsDraw: probToOdds(probDraw),
@@ -133,12 +128,10 @@ export function useMarkets() {
 
   return {
     markets,
-    isLoading: idsLoading || marketsLoading,
+    isLoading: isContractConfigured ? (idsLoading || marketsLoading) : false,
     refetch: invalidate,
   };
 }
-
-// ─── Single market hook ───────────────────────────────────────────────────────
 
 export function useMarket(marketId: bigint | undefined) {
   const { markets, isLoading, refetch } = useMarkets();

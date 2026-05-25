@@ -1,8 +1,3 @@
-/**
- * BetModal.tsx — Full bet placement modal
- * USDC amount input + YES/NO/DRAW toggle + cost preview + submit
- */
-
 import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { usePrivy } from "@privy-io/react-auth";
@@ -11,19 +6,10 @@ import { formatUsdc, parseUsdc, lmsrCost, totalCostWithFee, probToOdds } from "@
 import type { Market } from "@/hooks/useMarkets";
 import { matchToShareText } from "@/lib/footballData";
 
-interface BetModalProps {
-  market: Market;
-  onClose: () => void;
-  onSuccess?: () => void;
-}
-
+interface BetModalProps { market: Market; onClose: () => void; onSuccess?: () => void; }
 type OutcomeLabel = "Home" | "Draw" | "Away";
 
-const OUTCOME_MAP: Record<OutcomeLabel, BetOutcome> = {
-  Home: 1,
-  Draw: 3,
-  Away: 2,
-};
+const OUTCOME_MAP: Record<OutcomeLabel, BetOutcome> = { Home: 1, Draw: 3, Away: 2 };
 
 export function BetModal({ market, onClose, onSuccess }: BetModalProps) {
   const { address } = useAccount();
@@ -31,249 +17,157 @@ export function BetModal({ market, onClose, onSuccess }: BetModalProps) {
   const { balance, allowance } = useUsdcBalance(address);
   const { placeBet, isLoading, error, txHash } = useBet();
 
-  const [selectedOutcome, setSelectedOutcome] = useState<OutcomeLabel>("Home");
+  const [selected, setSelected] = useState<OutcomeLabel>("Home");
   const [amountStr, setAmountStr] = useState("10");
   const [preview, setPreview] = useState<{ cost: bigint; fee: bigint; total: bigint; shares: bigint } | null>(null);
 
-  // Derive preview from LMSR
   useEffect(() => {
     const amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) {
-      setPreview(null);
-      return;
-    }
+    if (isNaN(amount) || amount <= 0) { setPreview(null); return; }
     const shares = parseUsdc(amountStr);
-
-    // Map outcome label to share array index: Home=0, Away=1, Draw=2
-    const outcomeToIdx: Record<OutcomeLabel, number> = { Home: 0, Away: 1, Draw: 2 };
-    const cost = lmsrCost(market.shares, outcomeToIdx[selectedOutcome], shares);
+    const idxMap: Record<OutcomeLabel, number> = { Home: 0, Away: 1, Draw: 2 };
+    const cost = lmsrCost(market.shares, idxMap[selected], shares);
     const { net, fee, total } = totalCostWithFee(cost);
     setPreview({ cost: net, fee, total, shares });
-  }, [amountStr, selectedOutcome, market.shares]);
+  }, [amountStr, selected, market.shares]);
 
   const handleBet = useCallback(async () => {
     if (!authenticated) { void login(); return; }
     if (!preview) return;
-
-    const outcome = OUTCOME_MAP[selectedOutcome];
-    const slippage = (preview.total * 105n) / 100n; // 5% slippage tolerance
-
+    const outcome = OUTCOME_MAP[selected];
     const tx = await placeBet({
-      marketId: market.id,
-      outcome,
-      shares: preview.shares,
-      maxCost: slippage,
-      currentAllowance: allowance,
+      marketId: market.id, outcome, shares: preview.shares,
+      maxCost: (preview.total * 105n) / 100n, currentAllowance: allowance,
     });
-
-    if (tx) {
-      onSuccess?.();
-      // Let toast show success — don't close immediately
-      setTimeout(onClose, 2000);
-    }
-  }, [authenticated, login, preview, selectedOutcome, placeBet, market.id, allowance, onSuccess, onClose]);
+    if (tx) { onSuccess?.(); setTimeout(onClose, 2000); }
+  }, [authenticated, login, preview, selected, placeBet, market.id, allowance, onSuccess, onClose]);
 
   const handleShare = () => {
-    const outcomeLabel = selectedOutcome;
-    const idxMap: Record<OutcomeLabel, number> = { Home: 0, Away: 1, Draw: 2 };
-    const probMap: Record<OutcomeLabel, number> = {
-      Home: market.probHome,
-      Away: market.probAway,
-      Draw: market.probDraw,
-    };
-    const odds = probToOdds(probMap[selectedOutcome]);
-
+    const probMap: Record<OutcomeLabel, number> = { Home: market.probHome, Away: market.probAway, Draw: market.probDraw };
+    const odds = probToOdds(probMap[selected]);
     const fdMatch = {
       id: Number(market.id),
       homeTeam: { shortName: market.homeTeam, name: market.homeTeam, id: 0, tla: "", crest: "" },
       awayTeam: { shortName: market.awayTeam, name: market.awayTeam, id: 0, tla: "", crest: "" },
       competition: { code: market.league, id: 0, name: market.league, type: "", emblem: "" },
     };
-
-    const text = matchToShareText(fdMatch as Parameters<typeof matchToShareText>[0], outcomeLabel, odds);
-    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-    window.open(tweetUrl, "_blank", "noopener,noreferrer");
+    const text = matchToShareText(fdMatch as Parameters<typeof matchToShareText>[0], selected, odds);
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
 
-  const oddsMap: Record<OutcomeLabel, number> = {
-    Home: market.oddsHome,
-    Draw: market.oddsDraw,
-    Away: market.oddsAway,
-  };
+  const oddsMap: Record<OutcomeLabel, number> = { Home: market.oddsHome, Draw: market.oddsDraw, Away: market.oddsAway };
+  const probMap: Record<OutcomeLabel, number> = { Home: market.probHome, Draw: market.probDraw, Away: market.probAway };
+  const insufficient = preview ? balance < preview.total : false;
+  const canBet = authenticated && preview && !isLoading && !insufficient && market.isOpen;
 
-  const probMap: Record<OutcomeLabel, number> = {
-    Home: market.probHome,
-    Draw: market.probDraw,
-    Away: market.probAway,
-  };
-
-  const insufficientBalance = preview ? balance < preview.total : false;
-  const canBet = authenticated && preview && !isLoading && !insufficientBalance && market.isOpen;
+  const outcomes: OutcomeLabel[] = ["Home", "Draw", "Away"];
 
   return (
     <>
       {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.5)",
-          zIndex: 200,
-          backdropFilter: "blur(2px)",
-        }}
-        aria-hidden="true"
-      />
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0, zIndex: 300,
+        background: "rgba(0,0,0,0.40)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+      }} />
 
       {/* Modal */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bet-modal-title"
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          zIndex: 201,
-          background: "var(--color-background-primary)",
-          border: "0.5px solid var(--color-border-secondary)",
-          borderRadius: "16px",
-          padding: "1.5rem",
-          width: "min(480px, calc(100vw - 2rem))",
-          maxHeight: "90vh",
-          overflowY: "auto",
-        }}
-      >
+      <div role="dialog" aria-modal="true" style={{
+        position: "fixed",
+        top: "50%", left: "50%",
+        transform: "translate(-50%, -50%)",
+        zIndex: 301,
+        background: "rgba(255,255,255,0.94)",
+        backdropFilter: "blur(24px) saturate(180%)",
+        WebkitBackdropFilter: "blur(24px) saturate(180%)",
+        border: "0.5px solid var(--border-mid)",
+        borderRadius: "var(--r-xl)",
+        padding: "1.5rem",
+        width: "min(480px, calc(100vw - 1.5rem))",
+        maxHeight: "92dvh",
+        overflowY: "auto",
+        boxShadow: "var(--shadow-modal)",
+        animation: "modalFadeIn 0.2s ease",
+      }}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
           <div>
-            <h2
-              id="bet-modal-title"
-              style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--color-text-primary)" }}
-            >
-              Place Bet
-            </h2>
-            <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-primary)" }}>Place Bet</h2>
+            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "2px" }}>
               {market.homeTeam} vs {market.awayTeam}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close modal"
-            style={{
-              background: "none",
-              border: "0.5px solid var(--color-border-tertiary)",
-              borderRadius: "8px",
-              padding: "4px 8px",
-              cursor: "pointer",
-              color: "var(--color-text-secondary)",
-              fontSize: "1rem",
-            }}
-          >
-            ×
-          </button>
+          <button onClick={onClose} style={{
+            background: "var(--bg-subtle-2)", border: "0.5px solid var(--border)",
+            borderRadius: "var(--r-md)", width: "32px", height: "32px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontSize: "1rem", color: "var(--text-secondary)", flexShrink: 0,
+          }}>×</button>
         </div>
 
         {/* Outcome toggle */}
         <div style={{ marginBottom: "1.25rem" }}>
-          <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", display: "block", marginBottom: "8px" }}>
+          <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
             Select outcome
           </label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-            {(["Home", "Draw", "Away"] as OutcomeLabel[]).map((o) => {
-              const active = selectedOutcome === o;
+          <div style={{ display: "flex", gap: "8px" }}>
+            {outcomes.map((o) => {
+              const active = selected === o;
               return (
-                <button
-                  key={o}
-                  onClick={() => setSelectedOutcome(o)}
-                  style={{
-                    padding: "0.75rem 0.5rem",
-                    borderRadius: "10px",
-                    border: active ? "2px solid #1e9e75" : "0.5px solid var(--color-border-secondary)",
-                    background: active ? "rgba(30,158,117,0.08)" : "var(--color-background-secondary)",
-                    cursor: "pointer",
-                    textAlign: "center",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  <div style={{ fontSize: "0.7rem", color: "var(--color-text-tertiary)", marginBottom: "4px" }}>
+                <button key={o} onClick={() => setSelected(o)} style={{
+                  flex: 1, padding: "0.75rem 0.5rem",
+                  borderRadius: "var(--r-lg)",
+                  border: active ? "2px solid var(--orange)" : "1px solid var(--border)",
+                  background: active ? "var(--orange-light)" : "var(--bg-subtle)",
+                  cursor: "pointer", textAlign: "center",
+                  transition: "all 0.15s",
+                  display: "flex", flexDirection: "column", gap: "3px",
+                }}>
+                  <span style={{ fontSize: "0.68rem", color: active ? "var(--orange)" : "var(--text-tertiary)", fontWeight: 600 }}>
                     {o === "Home" ? market.homeTeam : o === "Away" ? market.awayTeam : "Draw"}
-                  </div>
-                  <div style={{
-                    fontSize: "1.1rem",
-                    fontWeight: 700,
-                    color: active ? "#1e9e75" : "var(--color-text-primary)",
-                  }}>
+                  </span>
+                  <span style={{ fontSize: "1.15rem", fontWeight: 800, color: active ? "var(--orange)" : "var(--text-primary)" }}>
                     {oddsMap[o].toFixed(2)}x
-                  </div>
-                  <div style={{ fontSize: "0.7rem", color: "var(--color-text-tertiary)" }}>
+                  </span>
+                  <span style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>
                     {Math.round(probMap[o] * 100)}%
-                  </div>
+                  </span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Amount input */}
+        {/* Amount */}
         <div style={{ marginBottom: "1.25rem" }}>
-          <label
-            htmlFor="bet-amount"
-            style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", display: "block", marginBottom: "8px" }}
-          >
+          <label htmlFor="bet-amount" style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
             Amount (USDC)
           </label>
           <div style={{ position: "relative" }}>
-            <span style={{
-              position: "absolute",
-              left: "12px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--color-text-tertiary)",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-            }}>
-              $
-            </span>
+            <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)", fontWeight: 600, fontSize: "0.9rem", pointerEvents: "none" }}>$</span>
             <input
-              id="bet-amount"
-              type="number"
-              min="1"
-              step="1"
-              value={amountStr}
+              id="bet-amount" type="number" min="1" step="1" value={amountStr}
               onChange={(e) => setAmountStr(e.target.value)}
               style={{
-                width: "100%",
-                padding: "0.75rem 0.75rem 0.75rem 2rem",
-                borderRadius: "10px",
-                border: "0.5px solid var(--color-border-secondary)",
-                background: "var(--color-background-secondary)",
-                fontSize: "1rem",
-                fontWeight: 500,
-                color: "var(--color-text-primary)",
-                boxSizing: "border-box",
+                width: "100%", padding: "0.75rem 0.75rem 0.75rem 2rem",
+                borderRadius: "var(--r-md)", border: "1px solid var(--border-mid)",
+                background: "var(--bg-glass-deep)",
+                fontSize: "max(16px,1rem)", fontWeight: 600, color: "var(--text-primary)",
               }}
             />
           </div>
-
-          {/* Quick amounts */}
           <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
             {["10", "25", "50", "100"].map((v) => (
-              <button
-                key={v}
-                onClick={() => setAmountStr(v)}
-                style={{
-                  flex: 1,
-                  padding: "4px",
-                  borderRadius: "6px",
-                  border: "0.5px solid var(--color-border-tertiary)",
-                  background: amountStr === v ? "var(--color-background-secondary)" : "none",
-                  cursor: "pointer",
-                  fontSize: "0.75rem",
-                  color: "var(--color-text-secondary)",
-                }}
-              >
+              <button key={v} onClick={() => setAmountStr(v)} style={{
+                flex: 1, padding: "5px 4px",
+                borderRadius: "var(--r-sm)",
+                border: `1px solid ${amountStr === v ? "var(--orange)" : "var(--border)"}`,
+                background: amountStr === v ? "var(--orange-light)" : "var(--bg-subtle)",
+                cursor: "pointer", fontSize: "0.75rem", fontWeight: 600,
+                color: amountStr === v ? "var(--orange)" : "var(--text-secondary)",
+                transition: "all 0.12s",
+              }}>
                 ${v}
               </button>
             ))}
@@ -283,102 +177,74 @@ export function BetModal({ market, onClose, onSuccess }: BetModalProps) {
         {/* Cost breakdown */}
         {preview && (
           <div style={{
-            background: "var(--color-background-secondary)",
-            borderRadius: "10px",
-            padding: "1rem",
-            marginBottom: "1.25rem",
+            background: "var(--bg-subtle)", borderRadius: "var(--r-lg)",
+            padding: "1rem", marginBottom: "1rem",
+            border: "0.5px solid var(--border)",
           }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {[
-                { label: "Bet amount", value: formatUsdc(preview.cost) },
-                { label: "Platform fee (2%)", value: formatUsdc(preview.fee) },
-                { label: "Potential return", value: `~${formatUsdc(preview.shares * BigInt(Math.round(oddsMap[selectedOutcome] * 100)) / 100n)}` },
-              ].map((row) => (
-                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}>
-                  <span style={{ color: "var(--color-text-secondary)" }}>{row.label}</span>
-                  <span style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{row.value} USDC</span>
-                </div>
-              ))}
-              <div style={{ borderTop: "0.5px solid var(--color-border-tertiary)", paddingTop: "6px", marginTop: "2px", display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}>
-                <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>Total</span>
-                <span style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>{formatUsdc(preview.total)} USDC</span>
+            {[
+              { label: "Bet amount", value: formatUsdc(preview.cost) },
+              { label: "Platform fee (2%)", value: formatUsdc(preview.fee) },
+              { label: "Potential return", value: `~${formatUsdc(preview.shares * BigInt(Math.round(oddsMap[selected] * 100)) / 100n)}` },
+            ].map((row) => (
+              <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>{row.label}</span>
+                <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)" }}>{row.value} USDC</span>
               </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", marginTop: "4px", borderTop: "0.5px solid var(--border)" }}>
+              <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>Total</span>
+              <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--orange)" }}>{formatUsdc(preview.total)} USDC</span>
             </div>
-
-            {insufficientBalance && (
-              <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--color-text-danger)" }}>
-                ⚠ Insufficient balance. You have {formatUsdc(balance)} USDC.
+            {insufficient && (
+              <p style={{ fontSize: "0.78rem", color: "var(--red)", marginTop: "8px", fontWeight: 500 }}>
+                ⚠ Insufficient balance ({formatUsdc(balance)} USDC available)
               </p>
             )}
           </div>
         )}
 
-        {/* x402 note */}
-        <p style={{ margin: "0 0 1rem", fontSize: "0.75rem", color: "var(--color-text-tertiary)", textAlign: "center" }}>
-          ⚡ Powered by x402 — bet with USDC, no OKB needed for gas
+        <p style={{ fontSize: "0.72rem", color: "var(--text-tertiary)", textAlign: "center", marginBottom: "1rem" }}>
+          ⚡ x402 powered — bet with USDC, zero OKB gas fees
         </p>
 
-        {/* Error */}
         {error && (
-          <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: "var(--color-text-danger)", padding: "8px 12px", background: "var(--color-background-danger)", borderRadius: "8px" }}>
+          <div style={{ fontSize: "0.8rem", color: "var(--red)", padding: "0.625rem 0.875rem", background: "var(--red-bg)", borderRadius: "var(--r-md)", marginBottom: "0.75rem", border: "0.5px solid rgba(220,38,38,0.2)" }}>
             {error}
-          </p>
+          </div>
         )}
 
-        {/* Actions */}
+        {/* CTA row */}
         <div style={{ display: "flex", gap: "8px" }}>
           {!authenticated ? (
-            <button
-              onClick={() => void login()}
-              style={{
-                flex: 1,
-                padding: "0.875rem",
-                borderRadius: "10px",
-                border: "none",
-                background: "#1e9e75",
-                color: "#fff",
-                fontSize: "0.95rem",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
+            <button onClick={() => void login()} style={{
+              flex: 1, padding: "0.875rem", borderRadius: "var(--r-md)",
+              border: "none", background: "var(--black)", color: "#fff",
+              fontSize: "0.95rem", fontWeight: 700, cursor: "pointer",
+            }}>
               Connect to bet
             </button>
           ) : (
-            <button
-              onClick={() => void handleBet()}
-              disabled={!canBet}
-              style={{
-                flex: 1,
-                padding: "0.875rem",
-                borderRadius: "10px",
-                border: "none",
-                background: canBet ? "#1e9e75" : "var(--color-background-secondary)",
-                color: canBet ? "#fff" : "var(--color-text-tertiary)",
-                fontSize: "0.95rem",
-                fontWeight: 600,
-                cursor: canBet ? "pointer" : "not-allowed",
-                transition: "all 0.15s",
-              }}
-            >
-              {isLoading ? "Processing…" : `Bet ${selectedOutcome} ${oddsMap[selectedOutcome].toFixed(2)}x`}
+            <button onClick={() => void handleBet()} disabled={!canBet} style={{
+              flex: 1, padding: "0.875rem", borderRadius: "var(--r-md)",
+              border: "none",
+              background: canBet ? "var(--orange)" : "var(--bg-subtle-2)",
+              color: canBet ? "#fff" : "var(--text-tertiary)",
+              fontSize: "0.95rem", fontWeight: 700,
+              cursor: canBet ? "pointer" : "not-allowed",
+              boxShadow: canBet ? "0 4px 16px rgba(255,107,0,0.30)" : "none",
+              transition: "all 0.15s",
+            }}>
+              {isLoading ? "Processing…" : `Bet ${selected} @ ${oddsMap[selected].toFixed(2)}x`}
             </button>
           )}
-
           {txHash && (
-            <button
-              onClick={handleShare}
-              title="Share on X"
-              style={{
-                padding: "0.875rem",
-                borderRadius: "10px",
-                border: "0.5px solid var(--color-border-secondary)",
-                background: "none",
-                cursor: "pointer",
-                fontSize: "1rem",
-              }}
-              aria-label="Share bet on X/Twitter"
-            >
+            <button onClick={handleShare} title="Share on X" style={{
+              padding: "0.875rem", borderRadius: "var(--r-md)",
+              border: "1px solid var(--border-mid)",
+              background: "var(--bg-glass-deep)", cursor: "pointer",
+              fontSize: "0.95rem", fontWeight: 700, color: "var(--text-primary)",
+              flexShrink: 0,
+            }}>
               𝕏
             </button>
           )}

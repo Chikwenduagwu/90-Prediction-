@@ -1,173 +1,166 @@
-/* index.css — Global styles for GoalMarket */
+/* ── GoalMarket Design System — Glass/White/Black/Orange ── */
 
-/* ── CSS Variables (light mode defaults) ──────────────────────────────────── */
 :root {
-  --color-background-primary: #ffffff;
-  --color-background-secondary: #f5f4f0;
-  --color-background-tertiary: #f0ede8;
-  --color-background-info: #e6f1fb;
-  --color-background-success: #eaf3de;
-  --color-background-warning: #faeeda;
-  --color-background-danger: #fcebeb;
+  /* Backgrounds */
+  --bg-page:        #f8f8f8;
+  --bg-glass:       rgba(255, 255, 255, 0.72);
+  --bg-glass-deep:  rgba(255, 255, 255, 0.88);
+  --bg-glass-card:  rgba(255, 255, 255, 0.60);
+  --bg-subtle:      rgba(0, 0, 0, 0.03);
+  --bg-subtle-2:    rgba(0, 0, 0, 0.055);
 
-  --color-text-primary: #1a1a18;
-  --color-text-secondary: #5f5e5a;
-  --color-text-tertiary: #888780;
-  --color-text-info: #185fa5;
-  --color-text-success: #3b6d11;
-  --color-text-warning: #854f0b;
-  --color-text-danger: #a32d2d;
+  /* Brand */
+  --orange:         #ff6b00;
+  --orange-light:   rgba(255, 107, 0, 0.10);
+  --orange-mid:     rgba(255, 107, 0, 0.18);
+  --black:          #0f0f0f;
+  --black-soft:     #1c1c1c;
 
-  --color-border-tertiary: rgba(0, 0, 0, 0.10);
-  --color-border-secondary: rgba(0, 0, 0, 0.20);
-  --color-border-primary: rgba(0, 0, 0, 0.35);
-  --color-border-info: #85b7eb;
-  --color-border-success: #97c459;
-  --color-border-warning: #ef9f27;
-  --color-border-danger: #f09595;
+  /* Text */
+  --text-primary:   #0f0f0f;
+  --text-secondary: #4a4a4a;
+  --text-tertiary:  #888;
+  --text-invert:    #ffffff;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "SF Mono", "Cascadia Code", "Fira Code", monospace;
-  --font-serif: Georgia, "Times New Roman", serif;
+  /* Borders (glass) */
+  --border:         rgba(0, 0, 0, 0.09);
+  --border-mid:     rgba(0, 0, 0, 0.15);
+  --border-strong:  rgba(0, 0, 0, 0.25);
+  --border-orange:  rgba(255, 107, 0, 0.40);
 
-  --border-radius-md: 8px;
-  --border-radius-lg: 12px;
-  --border-radius-xl: 16px;
+  /* Status */
+  --green:          #16a34a;
+  --green-bg:       rgba(22, 163, 74, 0.08);
+  --red:            #dc2626;
+  --red-bg:         rgba(220, 38, 38, 0.08);
+  --amber:          #d97706;
+  --amber-bg:       rgba(217, 119, 6, 0.08);
+  --blue:           #2563eb;
+  --blue-bg:        rgba(37, 99, 235, 0.08);
+
+  /* Legacy aliases used by existing components */
+  --color-background-primary:   var(--bg-glass-deep);
+  --color-background-secondary: var(--bg-subtle);
+  --color-background-tertiary:  var(--bg-page);
+  --color-background-success:   var(--green-bg);
+  --color-background-danger:    var(--red-bg);
+  --color-background-warning:   var(--amber-bg);
+  --color-background-info:      var(--blue-bg);
+  --color-text-primary:         var(--text-primary);
+  --color-text-secondary:       var(--text-secondary);
+  --color-text-tertiary:        var(--text-tertiary);
+  --color-text-success:         var(--green);
+  --color-text-danger:          var(--red);
+  --color-text-warning:         var(--amber);
+  --color-text-info:            var(--blue);
+  --color-border-tertiary:      var(--border);
+  --color-border-secondary:     var(--border-mid);
+  --color-border-primary:       var(--border-strong);
+  --color-border-success:       rgba(22, 163, 74, 0.30);
+  --color-border-danger:        rgba(220, 38, 38, 0.30);
+  --color-border-warning:       rgba(217, 119, 6, 0.30);
+  --color-border-info:          rgba(37, 99, 235, 0.30);
+
+  /* Radii */
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  16px;
+  --r-xl:  22px;
+  --r-2xl: 28px;
+
+  /* Glass shadows */
+  --shadow-card: 0 2px 16px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.07);
+  --shadow-float: 0 8px 32px rgba(0,0,0,0.10), 0 0 0 0.5px rgba(0,0,0,0.07);
+  --shadow-modal: 0 24px 64px rgba(0,0,0,0.16), 0 0 0 0.5px rgba(0,0,0,0.08);
 }
 
-/* ── Dark mode ─────────────────────────────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background-primary: #1a1a18;
-    --color-background-secondary: #242422;
-    --color-background-tertiary: #141412;
-    --color-background-info: #042c53;
-    --color-background-success: #173404;
-    --color-background-warning: #412402;
-    --color-background-danger: #501313;
-
-    --color-text-primary: #f0ede8;
-    --color-text-secondary: #b4b2a9;
-    --color-text-tertiary: #888780;
-    --color-text-info: #85b7eb;
-    --color-text-success: #97c459;
-    --color-text-warning: #ef9f27;
-    --color-text-danger: #f09595;
-
-    --color-border-tertiary: rgba(255, 255, 255, 0.10);
-    --color-border-secondary: rgba(255, 255, 255, 0.20);
-    --color-border-primary: rgba(255, 255, 255, 0.35);
-    --color-border-info: #185fa5;
-    --color-border-success: #3b6d11;
-    --color-border-warning: #854f0b;
-    --color-border-danger: #a32d2d;
-  }
-}
-
-/* ── Reset ─────────────────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* prevent iOS text resize */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  margin: 0;
-  font-family: var(--font-sans);
-  color: var(--color-text-primary);
-  background: var(--color-background-tertiary);
-  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  /* Subtle mesh gradient background */
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(255,107,0,0.055) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(15,15,15,0.04) 0%, transparent 55%);
+  min-height: 100vh;
+  line-height: 1.5;
+  overflow-x: hidden;
 }
 
-/* ── Typography ──────────────────────────────────────────────────────────────── */
-h1, h2, h3, h4, h5, h6 {
-  color: var(--color-text-primary);
-  line-height: 1.25;
+/* ── Typography ── */
+h1,h2,h3,h4,h5,h6 { line-height: 1.2; color: var(--text-primary); }
+p { line-height: 1.6; }
+a { color: inherit; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+
+/* ── Glass card utility ── */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 0.5px solid var(--border);
+  box-shadow: var(--shadow-card);
 }
 
-p {
-  line-height: 1.6;
-}
-
-/* ── Form elements ──────────────────────────────────────────────────────────── */
+/* ── Inputs ── */
 input[type="text"],
 input[type="number"],
 input[type="email"],
-textarea,
-select {
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  color: var(--color-text-primary);
-  background: var(--color-background-secondary);
-  border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-md);
+textarea, select {
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: var(--bg-glass-deep);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-md);
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  /* mobile: disable zoom on focus (iOS requires ≥16px) */
+  font-size: max(16px, 1rem);
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--orange-light);
 }
 
-input[type="text"]:focus,
-input[type="number"]:focus,
-input[type="email"]:focus,
-textarea:focus,
-select:focus {
-  border-color: #1e9e75;
-  box-shadow: 0 0 0 3px rgba(30, 158, 117, 0.12);
-}
+button { font-family: inherit; touch-action: manipulation; }
 
-button {
-  font-family: var(--font-sans);
-}
-
-/* ── Scrollbar (webkit) ─────────────────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-border-secondary);
-  border-radius: 3px;
-}
-
-/* ── Toast slide animation ──────────────────────────────────────────────────── */
+/* ── Animations ── */
 @keyframes toastSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(1rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(1.5rem) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0)      scale(1); }
 }
-
-/* ── Loading skeleton ───────────────────────────────────────────────────────── */
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
+  100% { background-position:  400px 0; }
 }
 
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--color-background-secondary) 25%,
-    var(--color-background-tertiary) 50%,
-    var(--color-background-secondary) 75%
-  );
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease infinite;
-  border-radius: var(--border-radius-md);
-}
+/* ── Mobile tap highlight ── */
+* { -webkit-tap-highlight-color: transparent; }
 
-/* ── Privy modal override — match our color scheme ──────────────────────────── */
-.privy-dialog-backdrop {
-  backdrop-filter: blur(4px) !important;
-}
+/* ── Safe area (notch phones) ── */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }

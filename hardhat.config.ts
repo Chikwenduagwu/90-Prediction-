@@ -20,7 +20,7 @@ const config: HardhatUserConfig = {
   networks: {
     // ── X Layer Mainnet ──────────────────────────────────────────────────
     xlayer: {
-      url: "https://rpc.xlayer.tech",
+      url: "https://xlayertestrpc.okx.com",
       chainId: 196,
       accounts: [PRIVATE_KEY],
       gasPrice: "auto",
@@ -28,7 +28,7 @@ const config: HardhatUserConfig = {
 
     // ── X Layer Testnet ──────────────────────────────────────────────────
     xlayer_testnet: {
-      url: "https://testrpc.xlayer.tech",
+      url: "https://xlayertestrpc.okx.com",
       chainId: 195,
       accounts: [PRIVATE_KEY],
       gasPrice: "auto",

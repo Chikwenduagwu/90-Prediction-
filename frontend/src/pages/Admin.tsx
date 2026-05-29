@@ -1,25 +1,29 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACT_ADDRESS } from "@/lib/wagmiConfig";
 
-const CREATE_MARKET_ABI = [
-  {
-    name: "createMarket",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "homeTeam", type: "string" },
-      { name: "awayTeam", type: "string" },
-      { name: "league", type: "string" },
-      { name: "matchTimestamp", type: "uint256" },
-      { name: "externalMatchId", type: "string" },
-    ],
-    outputs: [],
-  },
-] as const;
+// ─── Inline ABI for createMarket (avoids strict type conflicts) ───────────────
+const CREATE_MARKET_ABI = [{
+  name: "createMarket" as const,
+  type: "function" as const,
+  stateMutability: "nonpayable" as const,
+  inputs: [
+    { name: "homeTeam", type: "string" as const },
+    { name: "awayTeam", type: "string" as const },
+    { name: "league", type: "string" as const },
+    { name: "matchTimestamp", type: "uint256" as const },
+    { name: "externalMatchId", type: "string" as const },
+  ],
+  outputs: [] as const,
+}] as const;
 
+
+
+// ─── Hardcoded admin credentials (move to .env later) ───────────────────────
 const ADMIN_EMAIL = "chikwenduagwu@gmail.com";
 const ADMIN_PASSWORD = "Admin@90Predict!";
-const PREDICTION_MARKET_ABI = CREATE_MARKET_ABI;
+
 // ─── Preset market templates ─────────────────────────────────────────────────
 const PRESETS = [
   {
@@ -138,9 +142,9 @@ export function Admin() {
     try {
       writeContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: PREDICTION_MARKET_ABI,
-        functionName: "createMarket" as const,
-        args: [form.homeTeam, form.awayTeam, form.league, matchTimestamp, externalId] as const,
+        abi: CREATE_MARKET_ABI,
+        functionName: "createMarket",
+        args: [form.homeTeam, form.awayTeam, form.league, matchTimestamp, externalId],
       });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Transaction failed.");

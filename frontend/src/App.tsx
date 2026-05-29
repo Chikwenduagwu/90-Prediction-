@@ -20,12 +20,6 @@ import { Match } from "@/pages/Match";
 import { Admin } from "@/pages/Admin";
 import { Faucet } from "@/pages/Faucet";
 import { Portfolio } from "@/pages/Portfolio";
-import { Admin } from "@/pages/Admin";
-import { Faucet } from "@/pages/Faucet";
-
-// Inside <Routes>:
-<Route path="/admin" element={<Admin />} />
-<Route path="/faucet" element={<Faucet />} />
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 

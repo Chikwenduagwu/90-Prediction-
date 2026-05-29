@@ -17,6 +17,8 @@ import { ToastProvider } from "@/components/ToastProvider";
 import { Navbar } from "@/components/Navbar";
 import { Home } from "@/pages/Home";
 import { Match } from "@/pages/Match";
+import { Admin } from "@/pages/Admin";
+import { Faucet } from "@/pages/Faucet";
 import { Portfolio } from "@/pages/Portfolio";
 import { Admin } from "@/pages/Admin";
 import { Faucet } from "@/pages/Faucet";
@@ -147,7 +149,9 @@ export default function App() {
                     <Routes>
                       <Route path="/"          element={<Home />}      />
                       <Route path="/match/:id" element={<Match />}     />
-                      <Route path="/portfolio" element={<Portfolio />} />
+                      <Route path="/admin" element={<Admin />} />
+          <Route path="/faucet" element={<Faucet />} />
+          <Route path="/portfolio" element={<Portfolio />} />
                       <Route path="*"          element={<NotFound />}  />
                     </Routes>
                   </div>

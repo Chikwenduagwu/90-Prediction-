@@ -1,0 +1,8 @@
+npx hardhat verify
+
+sed -i 's/function _calculatePayout.*pure/function _calculatePayout(Market storage m, Position storage pos) internal view/' contracts/PredictionMarket.sol
+
+sed -i 's/function _calculateRefund.*pure/function _calculateRefund(Market storage m, Position storage pos) internal view/' contracts/PredictionMarket.solo
+node_modules
+
+node_modules

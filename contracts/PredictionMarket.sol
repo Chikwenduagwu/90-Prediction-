@@ -132,7 +132,7 @@ contract PredictionMarket is ReentrancyGuard, Ownable {
     //  Constructor
     // ─────────────────────────────────────────────
 
-    constructor(address _usdc, address _feeRecipient) Ownable(msg.sender) {
+    constructor(address _usdc, address _feeRecipient) Ownable() {
         require(_usdc != address(0), "PredictionMarket: zero usdc");
         require(_feeRecipient != address(0), "PredictionMarket: zero fee recipient");
         usdc = IERC20(_usdc);
@@ -353,7 +353,7 @@ contract PredictionMarket is ReentrancyGuard, Ownable {
      * @return cost USDC cost in 6-decimal precision
      */
     function lmsrCost(
-        int256[3] storage currentShares,
+        int256[3] memory currentShares,
         uint256 outcomeIdx,
         int256 quantity
     ) public view returns (uint256 cost) {
@@ -475,7 +475,7 @@ contract PredictionMarket is ReentrancyGuard, Ownable {
      * @dev LMSR cost function: b * ln(sum(exp(q_i/b)))
      *      Uses integer approximation; 6-decimal USDC output
      */
-    function _lmsrC(int256[3] memory s) internal pure returns (uint256) {
+    function _lmsrC(int256[3] memory s) internal view returns (uint256) {
         uint256 eH = _expScaled(s[0]);
         uint256 eA = _expScaled(s[1]);
         uint256 eD = _expScaled(s[2]);
@@ -489,7 +489,7 @@ contract PredictionMarket is ReentrancyGuard, Ownable {
      * @dev Compute exp(shares / LMSR_B) scaled by WAD
      *      shares in 6-decimal, LMSR_B in 6-decimal → ratio is unit-less
      */
-    function _expScaled(int256 shares) internal pure returns (uint256) {
+    function _expScaled(int256 shares) internal view returns (uint256) {
         // Normalize: x = shares / LMSR_B (stored as WAD fixed-point)
         // Then compute e^x via Taylor: 1 + x + x²/2 + x³/6 + ...
         // We truncate at x ∈ [-10, 10] for safety
@@ -505,7 +505,7 @@ contract PredictionMarket is ReentrancyGuard, Ownable {
      * @dev Natural log approximation for positive integers (WAD-scaled)
      *      Accurate to ~0.1% for our use range
      */
-    function _ln(uint256 x) internal pure returns (uint256) {
+    function _ln(uint256 x) internal view returns (uint256) {
         if (x == 0) return 0;
         // Use bit-length trick for ln approximation
         // ln(x) ≈ (bit_length - 1) * ln(2) + correction
@@ -524,7 +524,7 @@ contract PredictionMarket is ReentrancyGuard, Ownable {
     /**
      * @dev e^x in WAD fixed-point using Taylor expansion (x in WAD)
      */
-    function _expWad(int256 x) internal pure returns (uint256) {
+    function _expWad(int256 x) internal view returns (uint256) {
         if (x == 0) return WAD;
         bool neg = x < 0;
         uint256 ax = neg ? uint256(-x) : uint256(x);
@@ -566,7 +566,7 @@ contract PredictionMarket is ReentrancyGuard, Ownable {
 
     function _calculateRefund(Market storage m, Position storage pos)
         internal
-        pure
+        view
         returns (uint256 refund)
     {
         // On cancellation: return LMSR value of remaining shares

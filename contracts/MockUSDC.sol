@@ -21,7 +21,7 @@ contract MockUSDC is ERC20, Ownable {
 
     event Faucet(address indexed recipient, uint256 amount);
 
-    constructor() ERC20("Mock USD Coin", "mUSDC") Ownable(msg.sender) {
+    constructor() ERC20("Mock USD Coin", "mUSDC") Ownable() {
         // Mint initial supply to deployer (for liquidity seeding)
         _mint(msg.sender, 1_000_000 * 10 ** 6); // 1M USDC
     }

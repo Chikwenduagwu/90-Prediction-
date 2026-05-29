@@ -1,13 +1,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACT_ADDRESS } from "@/lib/wagmiConfig";
-import { PREDICTION_MARKET_ABI } from "@/lib/contractAbi";
 
-// ─── Hardcoded admin credentials (move to .env later) ───────────────────────
-const ADMIN_EMAIL = "chikwenduagwu@gmail.com";
-const ADMIN_PASSWORD = "Admin@90Predict!";
-
+const CREATE_MARKET_ABI = [
+  {
+    name: "createMarket",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "homeTeam", type: "string" },
+      { name: "awayTeam", type: "string" },
+      { name: "league", type: "string" },
+      { name: "matchTimestamp", type: "uint256" },
+      { name: "externalMatchId", type: "string" },
+    ],
+    outputs: [],
+  },
+] as const;
 // ─── Preset market templates ─────────────────────────────────────────────────
 const PRESETS = [
   {

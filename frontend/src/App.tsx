@@ -18,6 +18,12 @@ import { Navbar } from "@/components/Navbar";
 import { Home } from "@/pages/Home";
 import { Match } from "@/pages/Match";
 import { Portfolio } from "@/pages/Portfolio";
+import { Admin } from "@/pages/Admin";
+import { Faucet } from "@/pages/Faucet";
+
+// Inside <Routes>:
+<Route path="/admin" element={<Admin />} />
+<Route path="/faucet" element={<Faucet />} />
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 

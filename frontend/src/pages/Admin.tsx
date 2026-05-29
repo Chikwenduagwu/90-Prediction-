@@ -16,6 +16,10 @@ const CREATE_MARKET_ABI = [
     outputs: [],
   },
 ] as const;
+
+const ADMIN_EMAIL = "chikwenduagwu@gmail.com";
+const ADMIN_PASSWORD = "Admin@90Predict!";
+const PREDICTION_MARKET_ABI = CREATE_MARKET_ABI;
 // ─── Preset market templates ─────────────────────────────────────────────────
 const PRESETS = [
   {

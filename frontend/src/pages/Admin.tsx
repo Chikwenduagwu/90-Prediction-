@@ -127,8 +127,8 @@ export function Admin() {
       writeContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: PREDICTION_MARKET_ABI,
-        functionName: "createMarket",
-        args: [form.homeTeam, form.awayTeam, form.league, matchTimestamp, externalId],
+        functionName: "createMarket" as const,
+        args: [form.homeTeam, form.awayTeam, form.league, matchTimestamp, externalId] as const,
       });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Transaction failed.");

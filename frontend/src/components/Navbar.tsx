@@ -154,6 +154,7 @@ export function Navbar() {
           flexDirection: "column",
           gap: "4px",
         }}>
+          <a href="/faucet">🚰 Faucet</a>
           <Link to="/" onClick={() => setMenuOpen(false)} style={linkStyle(isActive("/"))}>⚽ Markets</Link>
           <Link to="/portfolio" onClick={() => setMenuOpen(false)} style={linkStyle(isActive("/portfolio"))}>📊 Portfolio</Link>
         </div>

@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { CONTRACT_ADDRESS } from "@/lib/wagmiConfig";
 
-// ─── Inline ABI for createMarket (avoids strict type conflicts) ───────────────
+const ADMIN_EMAIL = "chikwenduagwu@gmail.com";
+const ADMIN_PASSWORD = "Admin@90Predict!";
+
 const CREATE_MARKET_ABI = [{
   name: "createMarket" as const,
   type: "function" as const,
@@ -18,13 +21,6 @@ const CREATE_MARKET_ABI = [{
   outputs: [] as const,
 }] as const;
 
-
-
-// ─── Hardcoded admin credentials (move to .env later) ───────────────────────
-const ADMIN_EMAIL = "chikwenduagwu@gmail.com";
-const ADMIN_PASSWORD = "Admin@90Predict!";
-
-// ─── Preset market templates ─────────────────────────────────────────────────
 const PRESETS = [
   {
     category: "🌍 World Cup",
@@ -59,7 +55,6 @@ const PRESETS = [
   },
 ];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface MarketForm {
   homeTeam: string;
   awayTeam: string;
@@ -71,18 +66,17 @@ interface MarketForm {
 }
 
 const EMPTY_FORM: MarketForm = {
-  homeTeam: "",
-  awayTeam: "",
-  league: "",
-  question: "",
-  matchDate: "",
-  matchTime: "15:00",
-  externalMatchId: "",
+  homeTeam: "", awayTeam: "", league: "", question: "",
+  matchDate: "", matchTime: "15:00", externalMatchId: "",
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export function Admin() {
   const navigate = useNavigate();
+  const { authenticated } = usePrivy();
+  const { wallets } = useWallets();
+  const { address } = useAccount();
+  const activeAddress = address || wallets?.[0]?.address;
+
   const [authed, setAuthed] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -90,11 +84,22 @@ export function Admin() {
   const [form, setForm] = useState<MarketForm>(EMPTY_FORM);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
-  const { writeContract, data: txHash, isPending } = useWriteContract();
+  const { writeContract, data: txHash, isPending, error: writeError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
-  // ── Login handler ──
+  if (isSuccess && submitted && !successMsg) {
+    setSuccessMsg(`✅ Market "${form.homeTeam} vs ${form.awayTeam}" created!`);
+    setForm(EMPTY_FORM);
+    setSubmitted(false);
+  }
+
+  if (writeError && submitted && !errorMsg) {
+    setErrorMsg(writeError.message?.slice(0, 120) || "Transaction failed.");
+    setSubmitted(false);
+  }
+
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (loginEmail === ADMIN_EMAIL && loginPassword === ADMIN_PASSWORD) {
@@ -105,33 +110,27 @@ export function Admin() {
     }
   }
 
-  // ── Fill from preset ──
   function applyPreset(p: typeof PRESETS[0]["markets"][0]) {
-    const tomorrow = new Date(Date.now() + 86400000 * 3);
-    const dateStr = tomorrow.toISOString().split("T")[0];
+    const d = new Date(Date.now() + 86400000 * 3);
     setForm({
-      homeTeam: p.homeTeam,
-      awayTeam: p.awayTeam,
-      league: p.league,
-      question: p.question,
-      matchDate: dateStr,
-      matchTime: "15:00",
-      externalMatchId: `match_${Date.now()}`,
+      homeTeam: p.homeTeam, awayTeam: p.awayTeam,
+      league: p.league, question: p.question,
+      matchDate: d.toISOString().split("T")[0],
+      matchTime: "15:00", externalMatchId: `match_${Date.now()}`,
     });
-    setSuccessMsg("");
-    setErrorMsg("");
+    setSuccessMsg(""); setErrorMsg("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // ── Submit market ──
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSuccessMsg("");
-    setErrorMsg("");
+    setSuccessMsg(""); setErrorMsg("");
 
+    if (!authenticated && !activeAddress) {
+      setErrorMsg("Please connect your wallet first."); return;
+    }
     if (!form.homeTeam || !form.awayTeam || !form.league || !form.matchDate) {
-      setErrorMsg("Please fill all required fields.");
-      return;
+      setErrorMsg("Please fill all required fields."); return;
     }
 
     const matchTimestamp = BigInt(
@@ -139,40 +138,25 @@ export function Admin() {
     );
     const externalId = form.externalMatchId || `match_${Date.now()}`;
 
-    try {
-      writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CREATE_MARKET_ABI,
-        functionName: "createMarket",
-        args: [form.homeTeam, form.awayTeam, form.league, matchTimestamp, externalId],
-      });
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Transaction failed.");
-    }
+    setSubmitted(true);
+    writeContract({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      abi: CREATE_MARKET_ABI,
+      functionName: "createMarket",
+      args: [form.homeTeam, form.awayTeam, form.league, matchTimestamp, externalId],
+    });
   }
 
-  // Watch for success
-  if (isSuccess && !successMsg) {
-    setSuccessMsg(`✅ Market "${form.homeTeam} vs ${form.awayTeam}" created successfully!`);
-    setForm(EMPTY_FORM);
-  }
-
-  // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────
+  // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
   if (!authed) {
     return (
-      <div style={{
-        minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "1rem",
-      }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
         <div style={{
           width: "100%", maxWidth: "400px",
-          background: "var(--bg-glass)",
-          backdropFilter: "blur(24px) saturate(180%)",
+          background: "var(--bg-glass)", backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          border: "0.5px solid var(--border)",
-          borderRadius: "var(--r-2xl)",
-          padding: "2.5rem 2rem",
-          boxShadow: "var(--shadow-float)",
+          border: "0.5px solid var(--border)", borderRadius: "var(--r-2xl)",
+          padding: "2.5rem 2rem", boxShadow: "var(--shadow-float)",
         }}>
           <div style={{ textAlign: "center", marginBottom: "2rem" }}>
             <div style={{
@@ -182,229 +166,127 @@ export function Admin() {
               fontSize: "1.5rem", boxShadow: "0 8px 24px rgba(255,107,0,0.35)",
             }}>🔐</div>
             <h1 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-primary)" }}>Admin Panel</h1>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "4px" }}>
-              90-Prediction Market Admin
-            </p>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "4px" }}>90-Prediction Market Admin</p>
           </div>
 
           <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div>
               <label style={labelStyle}>Email</label>
-              <input
-                type="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="admin@example.com"
-                required
-                style={inputStyle}
-              />
+              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="admin@example.com" required style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle}>Password</label>
-              <input
-                type="password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                style={inputStyle}
-              />
+              <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="••••••••" required style={inputStyle} />
             </div>
-
-            {loginError && (
-              <div style={{
-                padding: "0.625rem 0.875rem", borderRadius: "var(--r-md)",
-                background: "rgba(239,68,68,0.1)", border: "0.5px solid rgba(239,68,68,0.3)",
-                color: "#ef4444", fontSize: "0.8rem", fontWeight: 600,
-              }}>
-                {loginError}
-              </div>
-            )}
-
-            <button type="submit" style={btnPrimaryStyle}>
-              Sign In →
-            </button>
+            {loginError && <div style={errorBoxStyle}>{loginError}</div>}
+            <button type="submit" style={btnPrimaryStyle}>Sign In →</button>
           </form>
 
           <button onClick={() => navigate("/")} style={{
             width: "100%", marginTop: "1rem", background: "none", border: "none",
             color: "var(--text-tertiary)", fontSize: "0.78rem", cursor: "pointer",
-          }}>
-            ← Back to markets
-          </button>
+          }}>← Back to markets</button>
         </div>
       </div>
     );
   }
 
-  // ─── ADMIN DASHBOARD ──────────────────────────────────────────────────────
+  // ── DASHBOARD ─────────────────────────────────────────────────────────────
   return (
     <main style={{ maxWidth: "960px", margin: "0 auto", padding: "1.5rem 1rem" }}>
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem", flexWrap: "wrap", gap: "0.75rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 900, color: "var(--text-primary)", letterSpacing: "-0.03em" }}>
             ⚙️ Admin Panel
           </h1>
           <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "2px" }}>
-            Create and manage prediction markets
+            {activeAddress ? `Wallet: ${activeAddress.slice(0, 6)}…${activeAddress.slice(-4)}` : "No wallet connected"}
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button onClick={() => navigate("/")} style={btnSecondaryStyle}>← Markets</button>
-          <button onClick={() => setAuthed(false)} style={{ ...btnSecondaryStyle, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)" }}>
-            Sign Out
-          </button>
+          <button onClick={() => setAuthed(false)} style={{ ...btnSecondaryStyle, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)" }}>Sign Out</button>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr min(340px, 100%)", gap: "1.5rem", alignItems: "start" }}>
-        {/* ── Create Market Form ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr min(340px,100%)", gap: "1.5rem", alignItems: "start" }}>
+        {/* Create Market Form */}
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>Create New Market</h2>
 
-          {successMsg && (
-            <div style={{
-              padding: "0.75rem 1rem", borderRadius: "var(--r-md)", marginBottom: "1rem",
-              background: "rgba(22,163,74,0.1)", border: "0.5px solid rgba(22,163,74,0.3)",
-              color: "var(--green)", fontSize: "0.85rem", fontWeight: 600,
-            }}>
-              {successMsg}
-            </div>
-          )}
-
-          {errorMsg && (
-            <div style={{
-              padding: "0.75rem 1rem", borderRadius: "var(--r-md)", marginBottom: "1rem",
-              background: "rgba(239,68,68,0.1)", border: "0.5px solid rgba(239,68,68,0.3)",
-              color: "#ef4444", fontSize: "0.85rem", fontWeight: 600,
-            }}>
-              {errorMsg}
-            </div>
-          )}
+          {successMsg && <div style={successBoxStyle}>{successMsg}</div>}
+          {errorMsg && <div style={errorBoxStyle}>{errorMsg}</div>}
+          {isPending && <div style={infoBoxStyle}>⏳ Waiting for wallet confirmation…</div>}
+          {isConfirming && <div style={infoBoxStyle}>⛓ Transaction submitted, waiting for block…</div>}
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
                 <label style={labelStyle}>Home Team / Option A *</label>
-                <input
-                  value={form.homeTeam}
-                  onChange={(e) => setForm({ ...form, homeTeam: e.target.value })}
-                  placeholder="e.g. Argentina"
-                  required
-                  style={inputStyle}
-                />
+                <input value={form.homeTeam} onChange={(e) => setForm({ ...form, homeTeam: e.target.value })}
+                  placeholder="e.g. Argentina" required style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Away Team / Option B *</label>
-                <input
-                  value={form.awayTeam}
-                  onChange={(e) => setForm({ ...form, awayTeam: e.target.value })}
-                  placeholder="e.g. France"
-                  required
-                  style={inputStyle}
-                />
+                <input value={form.awayTeam} onChange={(e) => setForm({ ...form, awayTeam: e.target.value })}
+                  placeholder="e.g. France" required style={inputStyle} />
               </div>
             </div>
-
             <div>
               <label style={labelStyle}>League / Category *</label>
-              <input
-                value={form.league}
-                onChange={(e) => setForm({ ...form, league: e.target.value })}
-                placeholder="e.g. FIFA World Cup"
-                required
-                style={inputStyle}
-              />
+              <input value={form.league} onChange={(e) => setForm({ ...form, league: e.target.value })}
+                placeholder="e.g. FIFA World Cup" required style={inputStyle} />
             </div>
-
             <div>
               <label style={labelStyle}>Question / Description</label>
-              <input
-                value={form.question}
-                onChange={(e) => setForm({ ...form, question: e.target.value })}
-                placeholder="e.g. Will Argentina make it to Round of 16?"
-                style={inputStyle}
-              />
+              <input value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })}
+                placeholder="e.g. Will Argentina make it to Round of 16?" style={inputStyle} />
             </div>
-
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
                 <label style={labelStyle}>Match Date *</label>
-                <input
-                  type="date"
-                  value={form.matchDate}
-                  onChange={(e) => setForm({ ...form, matchDate: e.target.value })}
-                  required
-                  style={inputStyle}
-                />
+                <input type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })}
+                  required style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Match Time</label>
-                <input
-                  type="time"
-                  value={form.matchTime}
-                  onChange={(e) => setForm({ ...form, matchTime: e.target.value })}
-                  style={inputStyle}
-                />
+                <input type="time" value={form.matchTime} onChange={(e) => setForm({ ...form, matchTime: e.target.value })}
+                  style={inputStyle} />
               </div>
             </div>
-
             <div>
               <label style={labelStyle}>External Match ID</label>
-              <input
-                value={form.externalMatchId}
-                onChange={(e) => setForm({ ...form, externalMatchId: e.target.value })}
-                placeholder={`match_${Date.now()}`}
-                style={inputStyle}
-              />
-              <p style={{ fontSize: "0.68rem", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                Leave blank to auto-generate
-              </p>
+              <input value={form.externalMatchId} onChange={(e) => setForm({ ...form, externalMatchId: e.target.value })}
+                placeholder={`match_${Date.now()}`} style={inputStyle} />
+              <p style={{ fontSize: "0.68rem", color: "var(--text-tertiary)", marginTop: "4px" }}>Leave blank to auto-generate</p>
             </div>
-
-            <button
-              type="submit"
-              disabled={isPending || isConfirming}
-              style={{
-                ...btnPrimaryStyle,
-                opacity: isPending || isConfirming ? 0.6 : 1,
-                cursor: isPending || isConfirming ? "not-allowed" : "pointer",
-              }}
-            >
+            <button type="submit" disabled={isPending || isConfirming} style={{
+              ...btnPrimaryStyle,
+              opacity: isPending || isConfirming ? 0.6 : 1,
+              cursor: isPending || isConfirming ? "not-allowed" : "pointer",
+            }}>
               {isPending ? "Confirm in wallet…" : isConfirming ? "Creating market…" : "🚀 Create Market"}
             </button>
           </form>
         </div>
 
-        {/* ── Preset Templates ── */}
+        {/* Presets */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           {PRESETS.map((group) => (
             <div key={group.category} style={cardStyle}>
               <h3 style={{ ...sectionTitleStyle, fontSize: "0.78rem" }}>{group.category}</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {group.markets.map((preset) => (
-                  <button
-                    key={preset.question}
-                    onClick={() => applyPreset(preset)}
-                    style={{
-                      padding: "0.6rem 0.875rem",
-                      borderRadius: "var(--r-md)",
-                      border: "0.5px solid var(--border)",
-                      background: "var(--bg-subtle)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.78rem", fontWeight: 500,
-                      cursor: "pointer", textAlign: "left",
-                      transition: "all 0.15s",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--orange)";
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--orange)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
-                    }}
+                  <button key={preset.question} onClick={() => applyPreset(preset)} style={{
+                    padding: "0.6rem 0.875rem", borderRadius: "var(--r-md)",
+                    border: "0.5px solid var(--border)", background: "var(--bg-subtle)",
+                    color: "var(--text-primary)", fontSize: "0.78rem", fontWeight: 500,
+                    cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                  }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--orange)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--orange)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)"; }}
                   >
                     {preset.question}
                   </button>
@@ -412,19 +294,13 @@ export function Admin() {
               </div>
             </div>
           ))}
-
-          {/* Tips */}
-          <div style={{
-            ...cardStyle,
-            background: "var(--orange-light)",
-            border: "0.5px solid var(--border-orange)",
-          }}>
+          <div style={{ ...cardStyle, background: "var(--orange-light)", border: "0.5px solid var(--border-orange)" }}>
             <h3 style={{ ...sectionTitleStyle, color: "var(--orange)" }}>💡 Tips</h3>
             <ul style={{ fontSize: "0.75rem", color: "var(--text-secondary)", paddingLeft: "1rem", margin: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
               <li>Click a preset to auto-fill the form</li>
-              <li>You can edit any field after applying a preset</li>
-              <li>Make sure your wallet is connected on XLayer Testnet</li>
+              <li>Make sure your wallet is on XLayer Testnet</li>
               <li>Each market creation is an on-chain transaction</li>
+              <li>Status messages appear above the form</li>
             </ul>
           </div>
         </div>
@@ -433,55 +309,49 @@ export function Admin() {
   );
 }
 
-// ─── Shared Styles ────────────────────────────────────────────────────────────
 const cardStyle: React.CSSProperties = {
-  background: "var(--bg-glass)",
-  backdropFilter: "blur(20px) saturate(160%)",
+  background: "var(--bg-glass)", backdropFilter: "blur(20px) saturate(160%)",
   WebkitBackdropFilter: "blur(20px) saturate(160%)",
-  border: "0.5px solid var(--border)",
-  borderRadius: "var(--r-xl)",
-  padding: "1.5rem",
-  boxShadow: "var(--shadow-card)",
+  border: "0.5px solid var(--border)", borderRadius: "var(--r-xl)",
+  padding: "1.5rem", boxShadow: "var(--shadow-card)",
 };
-
 const sectionTitleStyle: React.CSSProperties = {
-  fontSize: "0.85rem", fontWeight: 800,
-  color: "var(--text-primary)",
-  textTransform: "uppercase", letterSpacing: "0.06em",
-  marginBottom: "1rem",
+  fontSize: "0.85rem", fontWeight: 800, color: "var(--text-primary)",
+  textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "1rem",
 };
-
 const labelStyle: React.CSSProperties = {
   display: "block", fontSize: "0.72rem", fontWeight: 700,
   color: "var(--text-secondary)", marginBottom: "5px",
   textTransform: "uppercase", letterSpacing: "0.05em",
 };
-
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "0.625rem 0.875rem",
-  borderRadius: "var(--r-md)",
-  border: "0.5px solid var(--border)",
-  background: "var(--bg-subtle)",
-  color: "var(--text-primary)",
-  fontSize: "0.875rem", fontWeight: 500,
-  outline: "none", boxSizing: "border-box",
-  transition: "border-color 0.15s",
+  width: "100%", padding: "0.625rem 0.875rem", borderRadius: "var(--r-md)",
+  border: "0.5px solid var(--border)", background: "var(--bg-subtle)",
+  color: "var(--text-primary)", fontSize: "0.875rem", fontWeight: 500,
+  outline: "none", boxSizing: "border-box", transition: "border-color 0.15s",
 };
-
 const btnPrimaryStyle: React.CSSProperties = {
-  width: "100%", padding: "0.875rem",
-  borderRadius: "var(--r-md)", border: "none",
-  background: "var(--orange)", color: "#fff",
-  fontSize: "0.95rem", fontWeight: 700, cursor: "pointer",
-  boxShadow: "0 4px 20px rgba(255,107,0,0.3)",
-  transition: "box-shadow 0.15s",
+  width: "100%", padding: "0.875rem", borderRadius: "var(--r-md)", border: "none",
+  background: "var(--orange)", color: "#fff", fontSize: "0.95rem", fontWeight: 700,
+  cursor: "pointer", boxShadow: "0 4px 20px rgba(255,107,0,0.3)", transition: "box-shadow 0.15s",
 };
-
 const btnSecondaryStyle: React.CSSProperties = {
-  padding: "0.4rem 0.875rem",
-  borderRadius: "var(--r-md)",
-  border: "0.5px solid var(--border)",
-  background: "var(--bg-glass)",
-  color: "var(--text-secondary)",
-  fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
+  padding: "0.4rem 0.875rem", borderRadius: "var(--r-md)",
+  border: "0.5px solid var(--border)", background: "var(--bg-glass)",
+  color: "var(--text-secondary)", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
+};
+const successBoxStyle: React.CSSProperties = {
+  padding: "0.75rem 1rem", borderRadius: "var(--r-md)", marginBottom: "1rem",
+  background: "rgba(22,163,74,0.1)", border: "0.5px solid rgba(22,163,74,0.3)",
+  color: "var(--green)", fontSize: "0.85rem", fontWeight: 600,
+};
+const errorBoxStyle: React.CSSProperties = {
+  padding: "0.75rem 1rem", borderRadius: "var(--r-md)", marginBottom: "1rem",
+  background: "rgba(239,68,68,0.1)", border: "0.5px solid rgba(239,68,68,0.3)",
+  color: "#ef4444", fontSize: "0.85rem", fontWeight: 600,
+};
+const infoBoxStyle: React.CSSProperties = {
+  padding: "0.75rem 1rem", borderRadius: "var(--r-md)", marginBottom: "1rem",
+  background: "rgba(59,130,246,0.1)", border: "0.5px solid rgba(59,130,246,0.3)",
+  color: "#3b82f6", fontSize: "0.85rem", fontWeight: 600,
 };
